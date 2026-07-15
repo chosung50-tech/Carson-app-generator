@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>PITCH IQ — 피치 인식 트레이너</title>
+<!-- PWA: 홈 화면 추가 시 전체화면 앱처럼 실행 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PITCH IQ">
+<meta name="theme-color" content="#0A1A10">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%230A1A10'/%3E%3Ccircle cx='50' cy='50' r='30' fill='%23F5F2E8'/%3E%3Cpath d='M32 32 Q50 50 32 68' stroke='%23E8503A' stroke-width='4' fill='none'/%3E%3Cpath d='M68 32 Q50 50 68 68' stroke='%23E8503A' stroke-width='4' fill='none'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --field:#0A1A10;
+    --field-2:#0F2417;
+    --chalk:#F3EFE4;
+    --amber:#FFB03A;
+    --red:#E8503A;
+    --cyan:#4FC3D9;
+    --dim:#7A8C7F;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden}
+  body{
+    background:var(--field);
+    color:var(--chalk);
+    font-family:'Courier New', ui-monospace, monospace;
+    display:flex;flex-direction:column;align-items:center;
+    user-select:none;-webkit-user-select:none;
+  }
+  header{
+    width:100%;max-width:520px;
+    display:flex;justify-content:space-between;align-items:baseline;
+    padding:14px 18px 6px;
+  }
+  header h1{
+    font-size:15px;letter-spacing:4px;font-weight:700;color:var(--amber);
+  }
+  header .lvl{font-size:12px;letter-spacing:2px;color:var(--dim)}
+  #board{
+    width:100%;max-width:520px;
+    display:flex;justify-content:space-between;
+    padding:0 18px 8px;font-size:11px;letter-spacing:1px;color:var(--dim);
+  }
+  #board b{display:block;font-size:17px;color:var(--chalk);letter-spacing:0;margin-top:2px}
+  #board .rt b{color:var(--amber)}
+  #wrap{position:relative;width:100%;max-width:520px;flex:1;display:flex}
+  canvas{width:100%;height:100%;display:block;touch-action:none}
+  #msg{
+    position:absolute;top:34%;left:0;right:0;text-align:center;
+    pointer-events:none;font-weight:700;letter-spacing:2px;
+    font-size:22px;opacity:0;transition:opacity .12s;
+    text-shadow:0 2px 12px rgba(0,0,0,.6);
+  }
+  #overlay{
+    position:absolute;inset:0;background:rgba(6,14,9,.92);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:24px;gap:14px;
+  }
+  #overlay h2{font-size:20px;letter-spacing:3px;color:var(--amber)}
+  #overlay p{font-size:13px;line-height:1.8;color:var(--chalk);max-width:340px}
+  #overlay .rule{display:flex;gap:26px;margin:6px 0}
+  #overlay .rule div{font-size:12px;line-height:1.6}
+  .ballIcon{width:34px;height:34px;border-radius:50%;background:#F5F2E8;margin:0 auto 6px;position:relative;box-shadow:0 2px 8px rgba(0,0,0,.5)}
+  .ballIcon::before,.ballIcon::after{content:'';position:absolute;width:22px;height:22px;border-radius:50%;border:2.5px solid var(--red);border-color:transparent transparent var(--red) transparent;top:-7px;left:6px;transform:rotate(-18deg)}
+  .ballIcon::after{top:19px;transform:rotate(162deg)}
+  .ballIcon.take::before,.ballIcon.take::after{border-bottom-color:var(--cyan)}
+  #overlay button{
+    font-family:inherit;font-size:15px;font-weight:700;letter-spacing:3px;
+    background:var(--amber);color:#1A1206;border:none;border-radius:4px;
+    padding:14px 40px;cursor:pointer;margin-top:8px;
+  }
+  #overlay button:active{transform:scale(.97)}
+  #stats{font-size:12px;line-height:2;color:var(--dim);text-align:left}
+  #stats em{color:var(--chalk);font-style:normal}
+  .hidden{display:none !important}
+  footer{
+    width:100%;max-width:520px;text-align:center;
+    padding:10px;font-size:11px;letter-spacing:1px;color:var(--dim);
+  }
+  kbd{border:1px solid var(--dim);border-radius:3px;padding:1px 6px;font-size:10px}
+</style>
+</head>
+<body>
+<header><h1>PITCH IQ</h1><div class="lvl">LV <span id="lv">1</span></div></header>
+<div id="board">
+  <div>SCORE<b id="score">0</b></div>
+  <div class="rt">평균 반응<b id="rt">— ms</b></div>
+  <div>판단 정확도<b id="acc">—%</b></div>
+  <div>연속<b id="streak">0</b></div>
+</div>
+<div id="wrap">
+  <canvas id="cv"></canvas>
+  <div id="msg"></div>
+  <div id="overlay">
+    <h2>피치 인식 트레이너</h2>
+    <p>투수가 공을 던집니다. 공이 홈플레이트에 가까워질 때 <b style="color:var(--amber)">실밥 색</b>을 보고 판단하세요.</p>
+    <div class="rule">
+      <div><div class="ballIcon"></div><b style="color:var(--red)">빨간 실밥</b><br>= 스윙 (탭 / 스페이스)</div>
+      <div><div class="ballIcon take"></div><b style="color:var(--cyan)">파란 실밥</b><br>= 참기 (아무것도 안 함)</div>
+    </div>
+    <p style="font-size:11px;color:var(--dim)">레벨이 오르면 구속이 빨라지고, 실밥 색이 더 늦게 공개됩니다.<br>스윙 타이밍은 공이 플레이트 근처에 왔을 때만 유효합니다.</p>
+    <div id="stats" class="hidden"></div>
+    <button id="startBtn">PLAY BALL</button>
+  </div>
+</div>
+<footer>탭 또는 <kbd>SPACE</kbd> = 스윙 · 10구 = 1이닝</footer>
+
+<script>
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const msgEl = document.getElementById('msg');
+const overlay = document.getElementById('overlay');
+const statsEl = document.getElementById('stats');
+const startBtn = document.getElementById('startBtn');
+
+let W, H, DPR;
+function resize(){
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  const r = cv.parentElement.getBoundingClientRect();
+  W = r.width; H = r.height;
+  cv.width = W*DPR; cv.height = H*DPR;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+/* ---------- 상태 ---------- */
+const S = {
+  running:false, level:1, score:0, streak:0,
+  pitchNum:0, inningPitches:10,
+  results:[],           // {type:'hit'|'take-ok'|'chase'|'looking'|'early', rt}
+  ball:null, phase:'idle', // idle | windup | flight | result
+  phaseT:0, lastTime:0,
+};
+
+/* 레벨 파라미터: 체공시간(ms), 색 공개 시점(비행 진행률), 무브먼트 폭 */
+function params(lv){
+  return {
+    flight: Math.max(420, 950 - lv*55),          // Lv1 895ms → Lv9 ~460ms (150km/h급)
+    reveal: Math.min(0.62, 0.18 + lv*0.05),      // 색 공개가 점점 늦어짐
+    curve:  Math.min(70, 8 + lv*8),              // 좌우 무브먼트(px)
+    swingWin:[0.68, 1.0],                        // 스윙 유효 구간(비행 진행률)
+  };
+}
+
+function newPitch(){
+  const p = params(S.level);
+  S.ball = {
+    go: Math.random() < 0.55,                    // 55% 스윙 공
+    curveDir: Math.random()<.5?-1:1,
+    curveAmt: p.curve * (0.5 + Math.random()*0.5),
+    revealAt: p.reveal * (0.9 + Math.random()*0.2),
+    flight: p.flight,
+    revealTime: null, swung:false,
+  };
+  S.phase='windup'; S.phaseT=0;
+}
+
+/* ---------- 판정 ---------- */
+function endPitch(type, rt){
+  S.results.push({type, rt});
+  S.phase='result'; S.phaseT=0;
+  const good = (type==='hit'||type==='take-ok');
+  if(good){
+    S.streak++;
+    let pts = type==='hit' ? 100 + Math.max(0, Math.round((350-rt)/2)) : 60;
+    pts += S.streak*5;
+    S.score += pts;
+    flash(type==='hit' ? `HIT!  ${rt}ms` : 'GOOD TAKE', type==='hit'?'#FFB03A':'#4FC3D9');
+  }else{
+    S.streak=0;
+    flash(type==='chase'?'헛스윙! (파란공)': type==='early'?'너무 빠름!':'루킹 삼진!', '#E8503A');
+  }
+  updateBoard();
+}
+
+function swing(){
+  if(!S.running) return;
+  if(S.phase!=='flight'){ return; }
+  const b=S.ball, prog=S.phaseT/b.flight;
+  const p=params(S.level);
+  b.swung=true;
+  if(prog < p.swingWin[0]){ endPitch('early'); return; }
+  if(b.go){
+    const rt = Math.round(performance.now() - b.revealTime);
+    endPitch('hit', rt);
+  }else{
+    endPitch('chase');
+  }
+}
+
+/* ---------- 입력 ---------- */
+window.addEventListener('keydown', e=>{ if(e.code==='Space'){e.preventDefault(); swing();} });
+cv.addEventListener('pointerdown', swing);
+
+/* ---------- 메시지 ---------- */
+let msgTimer;
+function flash(t, color){
+  msgEl.textContent=t; msgEl.style.color=color; msgEl.style.opacity=1;
+  clearTimeout(msgTimer);
+  msgTimer=setTimeout(()=>msgEl.style.opacity=0, 650);
+}
+
+/* ---------- 스코어보드 ---------- */
+function updateBoard(){
+  document.getElementById('score').textContent=S.score;
+  document.getElementById('lv').textContent=S.level;
+  document.getElementById('streak').textContent=S.streak;
+  const hits=S.results.filter(r=>r.type==='hit');
+  document.getElementById('rt').textContent = hits.length? Math.round(hits.reduce((a,r)=>a+r.rt,0)/hits.length)+' ms':'— ms';
+  const done=S.results.length;
+  const ok=S.results.filter(r=>r.type==='hit'||r.type==='take-ok').length;
+  document.getElementById('acc').textContent = done? Math.round(ok/done*100)+'%':'—%';
+}
+
+/* ---------- 이닝 종료 ---------- */
+function endInning(){
+  S.running=false;
+  const inn=S.results.slice(-S.inningPitches);
+  const hits=inn.filter(r=>r.type==='hit');
+  const ok=inn.filter(r=>r.type==='hit'||r.type==='take-ok').length;
+  const acc=Math.round(ok/inn.length*100);
+  const avgRt=hits.length? Math.round(hits.reduce((a,r)=>a+r.rt,0)/hits.length):null;
+  const chases=inn.filter(r=>r.type==='chase').length;
+  const lookings=inn.filter(r=>r.type==='looking').length;
+
+  let grade, note;
+  if(acc>=90 && avgRt && avgRt<=280){grade='S'; note='프로급 반응. 레벨 업.';}
+  else if(acc>=80){grade='A'; note='판단은 안정적. 반응속도를 줄여보세요.';}
+  else if(acc>=60){grade='B'; note= chases>lookings?'유인구에 손이 나갑니다. 참는 훈련 필요.':'스윙 결단이 늦습니다. 색 확인 즉시 반응.';}
+  else{grade='C'; note='공 추적에 집중하세요. 공만 보고 판단.';}
+
+  const lvUp = acc>=75;
+  if(lvUp) S.level=Math.min(12, S.level+1);
+
+  statsEl.classList.remove('hidden');
+  statsEl.innerHTML =
+    `이닝 결과 — 등급 <em style="color:var(--amber);font-size:16px">${grade}</em><br>`+
+    `판단 정확도 <em>${acc}%</em> · 평균 반응 <em>${avgRt??'—'} ms</em><br>`+
+    `헛스윙(판단 실수) <em>${chases}</em> · 루킹(반응 지연) <em>${lookings}</em><br>`+
+    `${lvUp?'▲ 레벨 업! ':''}<span style="color:var(--amber)">${note}</span>`;
+  overlay.querySelector('h2').textContent='INNING OVER';
+  overlay.querySelector('p').classList.add('hidden');
+  overlay.querySelectorAll('.rule, p')[0]?.classList?.add('hidden');
+  document.querySelectorAll('#overlay p, #overlay .rule').forEach(el=>el.classList.add('hidden'));
+  startBtn.textContent='NEXT INNING';
+  overlay.classList.remove('hidden');
+  updateBoard();
+}
+
+startBtn.addEventListener('click', ()=>{
+  overlay.classList.add('hidden');
+  S.running=true; S.pitchNum=0;
+  S.phase='idle'; S.phaseT=0;
+  S.lastTime=performance.now();
+  requestAnimationFrame(loop);
+});
+
+/* ---------- 렌더 ---------- */
+function drawField(){
+  // 밤 경기장 그라데이션
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#0A1A10'); g.addColorStop(.55,'#0F2417'); g.addColorStop(1,'#143020');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+  // 마운드
+  const mx=W/2, my=H*0.30;
+  ctx.fillStyle='rgba(140,90,55,.35)';
+  ctx.beginPath(); ctx.ellipse(mx,my,42,13,0,0,7); ctx.fill();
+
+  // 홈플레이트 & 스트라이크존
+  const px=W/2, py=H*0.86;
+  ctx.strokeStyle='rgba(243,239,228,.55)'; ctx.lineWidth=2;
+  const zw=Math.min(150,W*0.34), zh=zw*1.15;
+  ctx.strokeRect(px-zw/2, py-zh-14, zw, zh);
+  ctx.setLineDash([4,6]); ctx.strokeStyle='rgba(243,239,228,.18)';
+  ctx.beginPath();
+  ctx.moveTo(px-zw/2, py-zh-14+zh/3); ctx.lineTo(px+zw/2, py-zh-14+zh/3);
+  ctx.moveTo(px-zw/2, py-zh-14+zh*2/3); ctx.lineTo(px+zw/2, py-zh-14+zh*2/3);
+  ctx.stroke(); ctx.setLineDash([]);
+
+  // 플레이트
+  ctx.fillStyle='rgba(243,239,228,.85)';
+  ctx.beginPath();
+  ctx.moveTo(px-30,py); ctx.lineTo(px+30,py); ctx.lineTo(px+30,py+9);
+  ctx.lineTo(px,py+18); ctx.lineTo(px-30,py+9); ctx.closePath(); ctx.fill();
+  return {mx,my,px,py,zh};
+}
+
+function drawBall(x,y,r,revealed,go,rot){
+  ctx.save(); ctx.translate(x,y);
+  ctx.shadowColor='rgba(0,0,0,.6)'; ctx.shadowBlur=r*0.6;
+  ctx.fillStyle='#F5F2E8';
+  ctx.beginPath(); ctx.arc(0,0,r,0,7); ctx.fill();
+  ctx.shadowBlur=0;
+  // 실밥
+  const seam = revealed ? (go?'#E8503A':'#4FC3D9') : 'rgba(120,120,115,.4)';
+  ctx.strokeStyle=seam; ctx.lineWidth=Math.max(1.5,r*0.14);
+  ctx.rotate(rot);
+  ctx.beginPath(); ctx.arc(-r*0.55,0,r*0.72,-1.1,1.1); ctx.stroke();
+  ctx.beginPath(); ctx.arc(r*0.55,0,r*0.72,Math.PI-1.1,Math.PI+1.1); ctx.stroke();
+  ctx.restore();
+}
+
+/* ---------- 루프 ---------- */
+function loop(t){
+  if(!S.running){ return; }
+  const dt=t-S.lastTime; S.lastTime=t;
+  S.phaseT+=dt;
+  const f=drawField();
+  const b=S.ball;
+
+  if(S.phase==='idle'){
+    if(S.phaseT>600){ newPitch(); }
+  }
+  else if(S.phase==='windup'){
+    // 투수 셋 표시(작은 점 진동)
+    ctx.fillStyle='rgba(243,239,228,.9)';
+    ctx.beginPath(); ctx.arc(f.mx, f.my-8, 5,0,7); ctx.fill();
+    if(S.phaseT>450+Math.random()*100){ S.phase='flight'; S.phaseT=0; }
+  }
+  else if(S.phase==='flight'){
+    const prog=Math.min(1, S.phaseT/b.flight);
+    // 색 공개 시점 기록
+    const revealed = prog>=b.revealAt;
+    if(revealed && b.revealTime===null) b.revealTime=performance.now();
+
+    // 궤적: 마운드→플레이트, 크기 확대 + 좌우 무브먼트
+    const ease=prog*prog*(3-2*prog);
+    const x=f.mx + Math.sin(prog*Math.PI)*b.curveAmt*b.curveDir;
+    const y=f.my + (f.py-42-f.my)*ease;
+    const r=4 + 24*ease;
+    drawBall(x,y,r,revealed,b.go, prog*14);
+
+    // 스윙 유효 구간 표시(플레이트 라인 발광)
+    const p=params(S.level);
+    if(prog>=p.swingWin[0]){
+      ctx.strokeStyle='rgba(255,176,58,.5)'; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.moveTo(f.px-60,f.py-4); ctx.lineTo(f.px+60,f.py-4); ctx.stroke();
+    }
+
+    if(prog>=1 && !b.swung){
+      endPitch(b.go?'looking':'take-ok');
+    }
+  }
+  else if(S.phase==='result'){
+    if(S.phaseT>700){
+      S.pitchNum++;
+      if(S.pitchNum>=S.inningPitches){ endInning(); return; }
+      S.phase='idle'; S.phaseT=0;
+    }
+  }
+  requestAnimationFrame(loop);
+}
+updateBoard();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "PITCH IQ — 피치 인식 트레이너",
+  "short_name": "PITCH IQ",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#0A1A10",
+  "theme_color": "#0A1A10",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
